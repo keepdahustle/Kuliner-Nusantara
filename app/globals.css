@@ -4,90 +4,88 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Kuliner Nusantara Color Palette */
-  --rempah-merah: #a64029;
+  /* Kuliner Nusantara Palette */
+  --rempah-merah-tua: #a64029;
   --kunyit-hangat: #dfaf2b;
-  --daun-hijau: #4e5b31;
+  --daun-hijau-tua: #4e5b31;
   --krem-santan: #f4e8d1;
-  --kopi-cokelat: #3b2f2f;
+  --cokelat-kopi: #3b2f2f;
   --cokelat-susu: #6e5849;
   --oranye-teralis: #e2903a;
+  --surface-light: #fff9f0;
 
-  /* Design System */
-  --background: #f4e8d1;
-  --foreground: #3b2f2f;
-  --card: #fff9f0;
-  --card-foreground: #3b2f2f;
-  --popover: #fff9f0;
-  --popover-foreground: #3b2f2f;
-  --primary: #a64029;
-  --primary-foreground: #ffffff;
-  --secondary: #dfaf2b;
-  --secondary-foreground: #3b2f2f;
-  --accent: #4e5b31;
-  --accent-foreground: #ffffff;
-  --muted: #e2d4c8;
-  --muted-foreground: #6e5849;
-  --accent-light: #e2903a;
-  --destructive: #a64029;
-  --destructive-foreground: #ffffff;
-  --border: #e2d4c8;
-  --input: #fff9f0;
-  --ring: #dfaf2b;
-  --chart-1: #a64029;
-  --chart-2: #dfaf2b;
-  --chart-3: #4e5b31;
-  --chart-4: #e2903a;
-  --chart-5: #6e5849;
-  --radius: 1rem;
-  --sidebar: #f4e8d1;
-  --sidebar-foreground: #3b2f2f;
-  --sidebar-primary: #a64029;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #4e5b31;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #e2d4c8;
-  --sidebar-ring: #dfaf2b;
+  --background: var(--krem-santan);
+  --foreground: var(--cokelat-kopi);
+  --card: var(--surface-light);
+  --card-foreground: var(--cokelat-kopi);
+  --popover: var(--surface-light);
+  --popover-foreground: var(--cokelat-kopi);
+  --primary: var(--rempah-merah-tua);
+  --primary-foreground: white;
+  --secondary: var(--kunyit-hangat);
+  --secondary-foreground: var(--cokelat-kopi);
+  --muted: #e8dcc8;
+  --muted-foreground: var(--cokelat-susu);
+  --accent: var(--daun-hijau-tua);
+  --accent-foreground: white;
+  --destructive: #dc2626;
+  --destructive-foreground: white;
+  --border: #e8dcc8;
+  --input: white;
+  --ring: var(--kunyit-hangat);
+  --chart-1: var(--rempah-merah-tua);
+  --chart-2: var(--kunyit-hangat);
+  --chart-3: var(--daun-hijau-tua);
+  --chart-4: var(--oranye-teralis);
+  --chart-5: var(--cokelat-susu);
+  --radius: 0.5rem;
+  --sidebar: var(--surface-light);
+  --sidebar-foreground: var(--cokelat-kopi);
+  --sidebar-primary: var(--rempah-merah-tua);
+  --sidebar-primary-foreground: white;
+  --sidebar-accent: var(--kunyit-hangat);
+  --sidebar-accent-foreground: var(--cokelat-kopi);
+  --sidebar-border: #e8dcc8;
+  --sidebar-ring: var(--kunyit-hangat);
 }
 
 .dark {
   --background: #2b2520;
   --foreground: #f4e8d1;
-  --card: #3b3430;
+  --card: #3b3530;
   --card-foreground: #f4e8d1;
-  --popover: #3b3430;
+  --popover: #3b3530;
   --popover-foreground: #f4e8d1;
-  --primary: #d6664f;
-  --primary-foreground: #1a1410;
-  --secondary: #f0c654;
-  --secondary-foreground: #1a1410;
-  --accent: #7a8b5c;
-  --accent-foreground: #f4e8d1;
-  --muted: #4b4440;
-  --muted-foreground: #c4b5ab;
-  --accent-light: #f5a842;
-  --destructive: #d6664f;
-  --destructive-foreground: #f4e8d1;
-  --border: #4b4440;
-  --input: #3b3430;
-  --ring: #f0c654;
-  --chart-1: #d6664f;
-  --chart-2: #f0c654;
-  --chart-3: #7a8b5c;
-  --chart-4: #f5a842;
-  --chart-5: #c4b5ab;
+  --primary: #d8563f;
+  --primary-foreground: #2b2520;
+  --secondary: #f5c957;
+  --secondary-foreground: #2b2520;
+  --muted: #5c4f47;
+  --muted-foreground: #b8aea3;
+  --accent: #6b7c47;
+  --accent-foreground: white;
+  --destructive: #ef4444;
+  --destructive-foreground: #2b2520;
+  --border: #5c4f47;
+  --input: #2b2520;
+  --ring: #f5c957;
+  --chart-1: #d8563f;
+  --chart-2: #f5c957;
+  --chart-3: #6b7c47;
+  --chart-4: #f5a03f;
+  --chart-5: #b8aea3;
   --sidebar: #2b2520;
   --sidebar-foreground: #f4e8d1;
-  --sidebar-primary: #d6664f;
-  --sidebar-primary-foreground: #f4e8d1;
-  --sidebar-accent: #7a8b5c;
-  --sidebar-accent-foreground: #f4e8d1;
-  --sidebar-border: #4b4440;
-  --sidebar-ring: #f0c654;
+  --sidebar-primary: #d8563f;
+  --sidebar-primary-foreground: #2b2520;
+  --sidebar-accent: #f5c957;
+  --sidebar-accent-foreground: #2b2520;
+  --sidebar-border: #5c4f47;
+  --sidebar-ring: #f5c957;
 }
 
 @theme inline {
-  --font-sans: "Plus Jakarta Sans", "Plus Jakarta Sans Fallback";
+  --font-sans: "Geist", "Geist Fallback";
   --font-mono: "Geist Mono", "Geist Mono Fallback";
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -113,10 +111,10 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -136,19 +134,9 @@
   }
 }
 
-/* Admin Utilities */
-.toast {
-  @apply fixed bottom-4 right-4 px-4 py-3 rounded-lg text-white font-medium animate-in fade-in-0 slide-in-from-bottom-2 duration-200 z-50;
-}
-
-.toast.success {
-  @apply bg-[#4E5B31];
-}
-
-.toast.error {
-  @apply bg-[#A64029];
-}
-
-.toast.info {
-  @apply bg-[#DFAF2B];
+/* Custom focus styles for Kuliner Nusantara */
+@layer utilities {
+  .focus-ring {
+    @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+  }
 }
