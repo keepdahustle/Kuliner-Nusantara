@@ -1,114 +1,159 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
+import Link from "next/link"
+import { 
+  Star, 
+  MessageSquare, 
+  AlertCircle, 
+  LogIn, 
+  CheckCircle2, 
+  Clock,
+  User as UserIcon
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { Card } from "@/components/ui/card"
 import RatingStars from "./rating-stars"
+import { fetchFromApi, postToApi } from "@/lib/data"
 
-interface Review {
-  rating: number
-  text: string
-  time: string
+interface ReviewsSectionProps {
+  culinaryId?: string
 }
 
-export default function ReviewsSection() {
-  const [reviews, setReviews] = useState<Review[]>([])
+export default function ReviewsSection({ culinaryId }: ReviewsSectionProps) {
+  const [reviews, setReviews] = useState<any[]>([])
   const [rating, setRating] = useState(0)
-  const [text, setText] = useState("")
-  const [averageRating, setAverageRating] = useState(0)
-
-  const kulinerId = "rendang-sapi-padang"
+  const [comment, setComment] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [statusMsg, setStatusMsg] = useState({ type: "", text: "" })
 
   useEffect(() => {
-    loadReviews()
-  }, [])
-
-  const loadReviews = () => {
-    const allReviews = JSON.parse(localStorage.getItem("kulinerReviews") || "{}")
-    const currentReviews = allReviews[kulinerId] || []
-    setReviews(currentReviews)
-    updateAverageRating(currentReviews)
-  }
-
-  const updateAverageRating = (reviewsList: Review[]) => {
-    if (reviewsList.length === 0) {
-      setAverageRating(0)
-      return
+    const token = localStorage.getItem("auth_token")
+    const role = localStorage.getItem("user_role")
+    if (token && (role === "visitor" || role === "member")) setIsLoggedIn(true)
+    
+    if (culinaryId) {
+      loadApprovedReviews()
+    } else {
+      setLoading(false)
     }
-    const total = reviewsList.reduce((sum, r) => sum + r.rating, 0)
-    setAverageRating(Math.round(total / reviewsList.length))
+  }, [culinaryId])
+
+  const loadApprovedReviews = async () => {
+    setLoading(true)
+    const res = await fetchFromApi<any[]>(`/reviews/${culinaryId}`)
+    setReviews(res || [])
+    setLoading(false) // FIX: Loading dimatikan meskipun data kosong
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (rating === 0 || text.trim() === "") {
-      alert("Harap berikan rating bintang dan isi ulasan Anda.")
+    if (rating === 0) {
+      setStatusMsg({ type: "error", text: "Pilih rating bintang dahulu." })
       return
     }
 
-    const newReview = {
-      rating,
-      text,
-      time: new Date().toISOString(),
+    setIsSubmitting(true)
+    setStatusMsg({ type: "", text: "" })
+
+    // FIX: Pastikan ID kuliner adalah Angka murni sebelum dikirim ke Laravel
+    const payload = {
+      culinary_id: parseInt(culinaryId || "0"),
+      rating: rating,
+      comment: comment
     }
 
-    const allReviews = JSON.parse(localStorage.getItem("kulinerReviews") || "{}")
-    const currentReviews = allReviews[kulinerId] || []
-    currentReviews.unshift(newReview)
-    allReviews[kulinerId] = currentReviews
-    localStorage.setItem("kulinerReviews", JSON.stringify(allReviews))
+    const res = await postToApi("/reviews", payload)
 
-    setReviews(currentReviews)
-    updateAverageRating(currentReviews)
-    setText("")
-    setRating(0)
+    if (res.success) {
+      setStatusMsg({ type: "success", text: res.message })
+      setRating(0)
+      setComment("")
+    } else {
+      setStatusMsg({ type: "error", text: res.message || "Gagal mengirim ulasan." })
+    }
+    setIsSubmitting(false)
   }
 
   return (
-    <section className="container mx-auto px-5 max-w-6xl mb-12">
-      <h2 className="font-serif text-2xl mb-6">Ulasan & Rating Pengguna</h2>
-
-      {/* Form Ulasan */}
-      <div className="bg-white p-8 rounded-2xl mb-8">
-        <h3 className="font-serif text-lg mb-4">Berikan Ulasan Anda</h3>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <RatingStars rating={rating} isInput={true} onRatingChange={setRating} />
-          </div>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Bagaimana pengalaman kuliner Anda..."
-            rows={4}
-            required
-            className="w-full rounded-lg p-2.5 font-sans border border-[#ccc]"
-          />
-          <button
-            type="submit"
-            className="bg-[#A64029] text-white border-none px-6 py-3 rounded-lg font-medium text-base cursor-pointer transition-colors hover:bg-[#85311e]"
-          >
-            Kirim Ulasan
-          </button>
-        </form>
+    <section className="font-sans space-y-10">
+      <div className="flex items-center gap-3">
+        <MessageSquare className="text-[#a64029] w-8 h-8" />
+        <h2 className="font-serif text-3xl text-[#3b2f2f] font-bold">Ulasan Pengunjung</h2>
       </div>
 
-      {/* Daftar Ulasan */}
-      <div className="space-y-5">
-        {reviews.length === 0 ? (
-          <p className="text-center text-[#6E5849]">Jadilah yang pertama memberikan ulasan!</p>
-        ) : (
-          reviews.map((review, index) => (
-            <div key={index} className="bg-white p-5 rounded-2xl border-l-4 border-[#DFAF2B]">
-              <div className="flex justify-between items-start mb-2">
-                <h4 className="m-0">Anonim</h4>
-                <RatingStars rating={review.rating} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        {/* INPUT ULASAN */}
+        <div className="lg:col-span-1">
+          <Card className="p-6 bg-white rounded-[32px] border-none shadow-sm sticky top-24">
+            <h3 className="font-bold text-[#3b2f2f] mb-4 text-lg">Berikan Rating Anda</h3>
+            {!isLoggedIn ? (
+              <div className="bg-[#f4e8d1]/50 p-6 rounded-2xl border border-dashed border-[#a64029]/20 text-center space-y-4">
+                <LogIn className="w-10 h-10 text-[#a64029] mx-auto opacity-40" />
+                <p className="text-sm text-[#6e5849] font-bold">Masuk sebagai Member untuk mengulas.</p>
+                <Link href="/login" className="block w-full py-3 bg-[#a64029] text-white rounded-xl font-bold text-xs no-underline hover:bg-[#85311e]">Masuk Sekarang</Link>
               </div>
-              <small className="text-[#6E5849]">{new Date(review.time).toLocaleString("id-ID")}</small>
-              <p className="text-[#6E5849] mt-2">{review.text}</p>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nilai Rasa</label>
+                  <RatingStars rating={rating} isInput={true} onRatingChange={setRating} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Komentar</label>
+                  <Textarea placeholder="Tulis pengalaman rasa Anda..." value={comment} onChange={(e) => setComment(e.target.value)} className="min-h-[120px] rounded-xl border-[#ddd] bg-gray-50/50" />
+                </div>
+                {statusMsg.text && (
+                  <div className={`p-4 rounded-xl text-xs font-bold flex gap-2 ${statusMsg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                    {statusMsg.type === 'success' ? <CheckCircle2 size={16}/> : <AlertCircle size={16}/>}
+                    {statusMsg.text}
+                  </div>
+                )}
+                <Button disabled={isSubmitting} className="w-full py-7 bg-[#a64029] hover:bg-[#85311e] text-white font-bold rounded-2xl shadow-lg transition-all">
+                  {isSubmitting ? "Mengirim..." : "Kirim Ulasan"}
+                </Button>
+              </form>
+            )}
+          </Card>
+        </div>
+
+        {/* DAFTAR ULASAN */}
+        <div className="lg:col-span-2">
+          {loading ? (
+            <div className="py-20 text-center animate-pulse">
+               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Memuat Data Ulasan...</p>
             </div>
-          ))
-        )}
+          ) : reviews.length === 0 ? (
+            <div className="bg-white/30 p-20 rounded-[48px] text-center border border-dashed border-[#ddd]">
+               {/* FIX: Teks saat tidak ada ulasan */}
+               <h4 className="font-serif text-2xl text-gray-400 font-bold italic">Belum Ada Ulasan</h4>
+               <p className="text-gray-400 text-sm mt-2">Jadilah orang pertama yang memberikan rating untuk menu ini!</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {reviews.map((rev: any) => (
+                <Card key={rev.id} className="p-8 bg-white border-none rounded-[32px] shadow-sm hover:shadow-md transition-all">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-[#dfaf2b] rounded-full flex items-center justify-center text-[#3b2f2f] font-bold">{rev.user?.name?.[0]}</div>
+                      <div>
+                        <h4 className="font-bold text-[#3b2f2f] text-lg">{rev.user?.name}</h4>
+                        <p className="text-[10px] text-gray-400"><Clock size={10} className="inline" /> {new Date(rev.created_at).toLocaleDateString('id-ID')}</p>
+                      </div>
+                    </div>
+                    <div className="flex text-yellow-500">
+                      {[...Array(5)].map((_, i) => (<Star key={i} size={14} fill={i < rev.rating ? "currentColor" : "none"} />))}
+                    </div>
+                  </div>
+                  <p className="text-[#3b2f2f] leading-relaxed text-sm italic">"{rev.comment}"</p>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   )
