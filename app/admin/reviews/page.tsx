@@ -1,257 +1,134 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import RatingStars from "@/components/rating-stars"
+import { 
+  Check, 
+  X, 
+  Star, 
+  MessageSquare, 
+  Search, 
+  Trash2,
+  AlertCircle,
+  Clock
+} from "lucide-react"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { fetchFromApi, postToApi } from "@/lib/data"
 
-interface AdminReview {
-  id: string
-  kulinerId: string
-  restoran: string
-  rating: number
-  content: string
-  time: string
-}
-
-// Halaman manajemen ulasan admin
-// Menampilkan semua ulasan yang dimasukkan pengguna di seluruh kuliner dari localStorage
-// Admin dapat mengedit atau menghapus ulasan. Tidak ada konsep pending/approve pada versi ini.
 export default function AdminReviewsPage() {
-  const [reviews, setReviews] = useState<AdminReview[]>([])
-  const [filteredReviews, setFilteredReviews] = useState<AdminReview[]>([])
+  const [reviews, setReviews] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest")
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editRating, setEditRating] = useState(0)
-  const [editText, setEditText] = useState("")
 
-  // Memuat ulasan dari localStorage dan mapping nama kuliner
   useEffect(() => {
-    async function loadData() {
-      // load kuliner list to map id -> title
-      let kulinerMap: Record<string, string> = {}
-      try {
-        const res = await fetch("/mock/home/kuliner.json")
-        const list = await res.json()
-        list.forEach((item: any) => {
-          kulinerMap[item.id] = item.title || item.nama || item.title
-        })
-      } catch (err) {
-        console.error("Gagal memuat data kuliner:", err)
-      }
-      // load reviews from localStorage
-      let combined: AdminReview[] = []
-      try {
-        const allReviews = JSON.parse(localStorage.getItem("kulinerReviews") || "{}")
-        Object.keys(allReviews).forEach((kulinerId) => {
-          const name = kulinerMap[kulinerId] || kulinerId
-          const items: any[] = allReviews[kulinerId]
-          items.forEach((r) => {
-            combined.push({
-              id: r.id || `${kulinerId}-${r.time}`,
-              kulinerId,
-              restoran: name,
-              rating: r.rating,
-              content: r.text,
-              time: r.time,
-            })
-          })
-        })
-      } catch (err) {
-        console.error("Gagal memuat ulasan dari localStorage:", err)
-      }
-      setReviews(combined)
-    }
-    loadData()
+    loadReviews()
   }, [])
 
-  // Filter & sorting
-  useEffect(() => {
-    let result = [...reviews]
-    // search filter
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase()
-      result = result.filter((r) =>
-        r.restoran.toLowerCase().includes(q) || r.content.toLowerCase().includes(q),
-      )
+  const loadReviews = async () => {
+    setLoading(true)
+    const res = await fetchFromApi<any[]>("/admin/reviews")
+    setReviews(res || [])
+    setLoading(false)
+  }
+
+  const handleStatusChange = async (id: number, status: string) => {
+    const res = await postToApi(`/admin/reviews/${id}/status`, { status })
+    if (res.success) {
+      loadReviews() // Reload data setelah update
+    } else {
+      alert("Gagal update status ulasan")
     }
-    // sort by date
-    result.sort((a, b) => {
-      const aTime = new Date(a.time).getTime()
-      const bTime = new Date(b.time).getTime()
-      return sortBy === "newest" ? bTime - aTime : aTime - bTime
-    })
-    setFilteredReviews(result)
-  }, [reviews, searchTerm, sortBy])
-
-  // handle delete review
-  const handleDelete = (review: AdminReview) => {
-    if (typeof window === "undefined") return
-    const allReviews = JSON.parse(localStorage.getItem("kulinerReviews") || "{}")
-    const list = allReviews[review.kulinerId] || []
-    const updated = list.filter((r: any) => r.id !== review.id)
-    allReviews[review.kulinerId] = updated
-    localStorage.setItem("kulinerReviews", JSON.stringify(allReviews))
-    setReviews((prev) => prev.filter((r) => r.id !== review.id))
   }
 
-  // handle start editing
-  const startEdit = (review: AdminReview) => {
-    setEditingId(review.id)
-    setEditRating(review.rating)
-    setEditText(review.content)
-  }
+  const filtered = reviews.filter(rev => 
+    rev.culinary?.nama?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    rev.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    rev.comment.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
-  // cancel editing
-  const cancelEdit = () => {
-    setEditingId(null)
-    setEditRating(0)
-    setEditText("")
-  }
-
-  // save edited review
-  const saveEdit = (review: AdminReview) => {
-    if (typeof window === "undefined") return
-    const allReviews = JSON.parse(localStorage.getItem("kulinerReviews") || "{}")
-    const list = allReviews[review.kulinerId] || []
-    const updatedList = list.map((r: any) => {
-      if (r.id === review.id) {
-        return { ...r, rating: editRating, text: editText }
-      }
-      return r
-    })
-    allReviews[review.kulinerId] = updatedList
-    localStorage.setItem("kulinerReviews", JSON.stringify(allReviews))
-    // update state
-    setReviews((prev) =>
-      prev.map((r) => (r.id === review.id ? { ...r, rating: editRating, content: editText } : r)),
-    )
-    cancelEdit()
-  }
+  if (loading) return <div className="p-10 text-center font-serif text-[#a64029]">Menarik Ulasan Visitor...</div>
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Manajemen Ulasan</h1>
-        <p className="text-muted-foreground">Edit atau hapus ulasan pengguna terhadap kuliner</p>
-      </div>
-      {/* Pencarian dan sorting */}
-      <div className="bg-card border border-border rounded-lg p-6 flex flex-col md:flex-row gap-4">
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-foreground mb-2">Cari Ulasan</label>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Cari berdasarkan nama kuliner atau isi ulasan..."
-            className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
+    <div className="space-y-6 font-sans">
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Urutkan</label>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="newest">Terbaru</option>
-            <option value="oldest">Terlama</option>
-          </select>
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <MessageSquare className="text-[#a64029]" />
+            Moderasi Ulasan
+          </h2>
+          <p className="text-gray-500 text-sm mt-1">Tinjau ulasan masuk. Hanya status 'Approved' yang tampil di halaman kuliner.</p>
         </div>
+        <Badge className="bg-yellow-50 text-yellow-700 h-10 px-4 rounded-xl border border-yellow-200 gap-2 font-bold">
+          <Clock size={16} /> {reviews.filter(r => r.status === 'pending').length} Perlu Tinjauan
+        </Badge>
       </div>
-      {/* List ulasan */}
+
+      <div className="relative">
+        <Search className="absolute left-4 top-3.5 text-gray-400 w-5 h-5" />
+        <input 
+          type="text" 
+          placeholder="Cari makanan, pengulas, atau kata kunci..."
+          className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#a64029] outline-none shadow-sm"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
       <div className="space-y-4">
-        {filteredReviews.length === 0 ? (
-          <div className="bg-card border border-border rounded-lg p-12 text-center">
-            <p className="text-foreground font-medium mb-2">Tidak ada ulasan</p>
-            <p className="text-muted-foreground">Belum ada ulasan yang tersimpan</p>
-          </div>
-        ) : (
-          filteredReviews.map((review) => (
-            <div
-              key={review.id}
-              className="bg-card border border-border rounded-lg p-6 hover:shadow-lg transition-shadow"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-foreground mb-1">{review.restoran}</h3>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>{new Date(review.time).toLocaleString("id-ID")}</span>
+        {filtered.map((rev) => (
+          <Card key={rev.id} className="p-6 bg-white border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-all">
+            <div className="flex flex-col md:flex-row justify-between gap-6">
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center gap-3">
+                  <Badge className="bg-[#dfaf2b] text-[#3b2f2f] hover:bg-[#dfaf2b] border-none font-bold px-3">
+                    {rev.culinary?.nama || "Menu Dihapus"}
+                  </Badge>
+                  <div className="flex items-center text-yellow-500 gap-0.5">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} size={14} fill={i < rev.rating ? "currentColor" : "none"} />
+                    ))}
                   </div>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                    {rev.user?.name} 
+                    <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-400 uppercase tracking-tighter">Visitor</span>
+                  </h4>
+                  <p className="text-gray-600 italic mt-2 text-sm bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    "{rev.comment}"
+                  </p>
                 </div>
               </div>
-              {/* Konten atau form edit */}
-              {editingId === review.id ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Ubah Rating</label>
-                    <RatingStars
-                      rating={editRating}
-                      isInput={true}
-                      onRatingChange={(val: number) => setEditRating(val)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Ubah Ulasan</label>
-                    <textarea
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-border rounded-lg text-foreground"
-                    />
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => saveEdit(review)}
-                      className="px-4 py-2 bg-[#4E5B31] hover:bg-[#3a4323] text-white rounded-lg"
-                    >
-                      Simpan
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      className="px-4 py-2 bg-[#A64029] hover:bg-[#8b3220] text-white rounded-lg"
-                    >
-                      Batal
-                    </button>
-                  </div>
+
+              <div className="flex flex-row md:flex-col items-center justify-end gap-3 md:min-w-[150px] border-t md:border-t-0 md:border-l border-gray-100 pt-4 md:pt-0 md:pl-6">
+                <div className="text-center">
+                   {rev.status === 'pending' && <span className="text-[10px] font-bold text-yellow-600 uppercase">Menunggu</span>}
+                   {rev.status === 'approved' && <span className="text-[10px] font-bold text-green-600 uppercase">Terbit</span>}
+                   {rev.status === 'rejected' && <span className="text-[10px] font-bold text-red-600 uppercase">Ditolak</span>}
                 </div>
-              ) : (
-                <>
-                  {/* Rating */}
-                  <div className="mb-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-semibold text-yellow-600">
-                        {"★".repeat(review.rating) + "☆".repeat(5 - review.rating)}
-                      </span>
-                      <span className="text-sm text-muted-foreground">{review.rating}/5</span>
-                    </div>
-                  </div>
-                  {/* Isi ulasan */}
-                  <p className="text-foreground text-sm mb-6 leading-relaxed">{review.content}</p>
-                  <div className="flex gap-3 pt-4 border-t border-border">
-                    <button
-                      onClick={() => startEdit(review)}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#4E5B31] hover:bg-[#3a4323] text-white rounded-lg transition-colors font-medium shadow-sm hover:shadow-md"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(review)}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#A64029] hover:bg-[#8b3220] text-white rounded-lg transition-colors font-medium shadow-sm hover:shadow-md"
-                    >
-                      Hapus
-                    </button>
-                  </div>
-                </>
-              )}
+
+                <div className="flex gap-2">
+                  {rev.status === 'pending' ? (
+                    <>
+                      <button onClick={() => handleStatusChange(rev.id, 'approved')} className="p-2.5 bg-[#4e5b31] text-white rounded-xl hover:bg-[#3a4323] transition-all shadow-sm"><Check size={18} /></button>
+                      <button onClick={() => handleStatusChange(rev.id, 'rejected')} className="p-2.5 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all shadow-sm"><X size={18} /></button>
+                    </>
+                  ) : (
+                    <button onClick={() => handleStatusChange(rev.id, 'pending')} className="text-xs font-bold text-gray-400 hover:text-[#a64029] underline">Reset Status</button>
+                  )}
+                </div>
+              </div>
             </div>
-          ))
+          </Card>
+        ))}
+
+        {filtered.length === 0 && (
+          <div className="py-20 text-center bg-white rounded-3xl border border-dashed border-gray-300">
+            <AlertCircle className="text-gray-200 w-12 h-12 mx-auto mb-2" />
+            <p className="text-gray-400 font-medium">Tidak ada ulasan ditemukan.</p>
+          </div>
         )}
-      </div>
-      {/* Info total */}
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>
-          Menampilkan {filteredReviews.length} dari {reviews.length} ulasan
-        </span>
       </div>
     </div>
   )

@@ -1,229 +1,102 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import Link from "next/link"
-import Image from "next/image"
-import { Footer } from "@/components/footer"
 import { useRouter } from "next/navigation"
+import Header from "@/components/header"
+import Footer from "@/components/footer"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card } from "@/components/ui/card"
+import { Utensils, Mail, Lock, ArrowRight, AlertCircle } from "lucide-react"
+import { postToApi } from "@/lib/data"
 
-export default function LoginPage() {
-  const router = useRouter()
-  // we use a username field for id (e.g. user, umkm, admin) or email for new users
+export default function VisitorLoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
-  const [error, setError] = useState("")
+  const [errorMsg, setErrorMsg] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError("")
     setIsLoading(true)
+    setErrorMsg("")
 
-    try {
-      // basic validation
-      if (!email || !password) {
-        setError("ID/Username dan password harus diisi")
-        return
+    const result = await postToApi("/login", { email, password });
+
+    if (result.success) {
+      // CEK: Jika ternyata dia admin, dilarang login di sini
+      if (result.role === "admin") {
+        setErrorMsg("Portal ini khusus Pengguna Umum. Gunakan Portal Admin.");
+        setIsLoading(false);
+        return;
       }
 
-      let role: string = "user"
-      const username = email.trim().toLowerCase()
-      // check predefined accounts
-      if (username === "admin" && password === "admin123") {
-        role = "admin"
-      } else if (username === "umkm" && password === "umkm123") {
-        role = "umkm"
-      } else if (username === "user" && password === "user123") {
-        role = "user"
+      localStorage.setItem("auth_token", result.token);
+      localStorage.setItem("user_role", result.role);
+      localStorage.setItem("user_info", JSON.stringify(result.user));
+      localStorage.setItem("user_logged_in", "true");
+
+      if (result.role === "umkm") {
+        localStorage.setItem("umkm_logged_in", "true");
+        router.push("/umkm");
       } else {
-        // for any other login attempt, just treat as normal user
-        role = "user"
+        router.push("/");
       }
-
-      const userData: any = {
-        email: username,
-        name: username,
-        avatar: "/logo-kuliner.jpg",
-        bio: "",
-        province: "",
-        userType: role,
-      }
-
-      localStorage.setItem("authUser", JSON.stringify(userData))
-
-      if (rememberMe) {
-        localStorage.setItem("rememberEmail", email)
-      }
-
-      // Redirect based on role
-      setTimeout(() => {
-        if (role === "admin") {
-          router.push("/admin")
-        } else if (role === "umkm") {
-          router.push("/umkm")
-        } else {
-          router.push("/")
-        }
-      }, 500)
-    } catch (err) {
-      setError("Terjadi kesalahan, silakan coba lagi")
-      console.error(err)
-    } finally {
-      setIsLoading(false)
+    } else {
+      setErrorMsg(result.message || "Gagal masuk. Cek email dan sandi.");
+      setIsLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#f4e8d1" }}>
-      {/* Header */}
-      <header
-        className="flex items-center justify-between gap-4 container mx-auto my-9 px-4 py-3 rounded-2xl"
-        style={{
-          maxWidth: "1000px",
-          background: "rgba(255, 255, 255, 0.06)",
-          backdropFilter: "blur(4px)",
-        }}
-      >
-        <div className="flex items-center gap-2.5">
-          <Image src="/logo-kuliner.jpg" alt="logo" width={48} height={48} className="rounded" />
-          <div className="text-lg font-bold" style={{ color: "#a64029" }}>
-            Kuliner Nusantara
+    <>
+      <Header />
+      <main className="min-h-screen bg-[#f4e8d1] flex items-center justify-center p-6 py-12 font-sans">
+        <Card className="w-full max-w-md p-8 bg-white rounded-[40px] shadow-xl border-none">
+          <div className="text-center mb-8">
+            <div className="bg-[#a64029]/10 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Utensils className="text-[#a64029] w-8 h-8" />
+            </div>
+            <h1 className="font-serif text-3xl text-[#3b2f2f] font-bold">Portal Member</h1>
+            <p className="text-[#6e5849] mt-2 text-sm">Masuk untuk memberi ulasan hidangan.</p>
           </div>
-        </div>
-        <nav className="flex gap-3">
-          <Link href="/" className="font-semibold no-underline" style={{ color: "#3b2f2f" }}>
-            Beranda
-          </Link>
-          <Link href="/register" className="font-semibold no-underline" style={{ color: "#3b2f2f" }}>
-            Daftar
-          </Link>
-        </nav>
-      </header>
 
-      {/* Main Content */}
-      <main
-        className="container mx-auto px-4 py-8 rounded-2xl"
-        style={{
-          maxWidth: "1000px",
-          background: "rgba(244, 232, 209, 0.92)",
-          boxShadow: "0 8px 30px rgba(23, 18, 12, 0.08)",
-        }}
-      >
-        <h2 className="text-2xl font-bold mb-8" style={{ color: "#a64029" }}>
-          Masuk
-        </h2>
-
-        <form onSubmit={handleSubmit} className="space-y-6 max-w-md">
-          {/* Error Message */}
-          {error && (
-            <div className="p-3 rounded text-white text-sm" style={{ backgroundColor: "#a64029" }}>
-              {error}
+          {errorMsg && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-sm flex gap-3 items-center font-bold">
+              <AlertCircle size={18} className="flex-shrink-0" /> {errorMsg}
             </div>
           )}
 
-          {/* Username / ID Field */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="loginEmail" className="font-semibold text-sm" style={{ color: "#6e5849" }}>
-              ID / Username
-            </label>
-            <input
-              id="loginEmail"
-              type="text"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="p-2.5 rounded border text-sm"
-              style={{
-                borderColor: "#ddd",
-                fontSize: "0.95rem",
-              }}
-              onFocus={(e) => {
-                e.target.style.outline = "3px solid rgba(226, 144, 58, 0.14)"
-                e.target.style.outlineOffset = "2px"
-              }}
-              onBlur={(e) => {
-                e.target.style.outline = "none"
-              }}
-            />
-          </div>
-
-          {/* Password Field */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="loginPassword" className="font-semibold text-sm" style={{ color: "#6e5849" }}>
-              Password
-            </label>
-            <div className="flex gap-2 items-center">
-              <input
-                id="loginPassword"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="flex-1 p-2.5 rounded border text-sm"
-                style={{
-                  borderColor: "#ddd",
-                  fontSize: "0.95rem",
-                }}
-                onFocus={(e) => {
-                  e.target.style.outline = "3px solid rgba(226, 144, 58, 0.14)"
-                  e.target.style.outlineOffset = "2px"
-                }}
-                onBlur={(e) => {
-                  e.target.style.outline = "none"
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="px-3 py-1.5 rounded border text-sm font-semibold"
-                style={{
-                  backgroundColor: "transparent",
-                  borderColor: "rgba(0, 0, 0, 0.06)",
-                  borderRadius: "8px",
-                }}
-              >
-                {showPassword ? "Sembunyikan" : "Tampilkan"}
-              </button>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-[#3b2f2f] ml-1">Email</label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-3.5 w-5 h-5 text-[#6e5849]" />
+                <Input type="email" placeholder="email@member.com" className="pl-12 py-7 border-[#ddd] rounded-2xl" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              </div>
             </div>
-          </div>
 
-          {/* Remember Me */}
-          <div className="flex gap-2">
-            <input
-              type="checkbox"
-              id="rememberMe"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-            />
-            <label htmlFor="rememberMe" className="font-semibold text-sm" style={{ color: "#6e5849" }}>
-              Ingat saya
-            </label>
-          </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-[#3b2f2f] ml-1">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-3.5 w-5 h-5 text-[#6e5849]" />
+                <Input type="password" placeholder="••••••••" className="pl-12 py-7 border-[#ddd] rounded-2xl" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              </div>
+            </div>
 
-          {/* Submit Button */}
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-4 py-2.5 rounded font-bold text-white"
-              style={{ backgroundColor: "#a64029" }}
-            >
-              {isLoading ? "Masuk..." : "Masuk"}
-            </button>
-            <Link href="/forgot-password" className="text-sm no-underline" style={{ color: "#6e5849" }}>
-              Lupa sandi?
-            </Link>
+            <Button type="submit" disabled={isLoading} className="w-full py-8 bg-[#a64029] hover:bg-[#85311e] text-white font-bold rounded-2xl text-lg flex gap-2">
+              {isLoading ? <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : "Masuk Sekarang"}
+            </Button>
+          </form>
+
+          <div className="mt-10 pt-6 border-t border-gray-100 text-center">
+            <p className="text-[#6e5849] text-sm">Belum punya akun? <Link href="/register" className="text-[#a64029] font-bold hover:underline">Daftar Member</Link></p>
           </div>
-        </form>
+        </Card>
       </main>
-
-      {/* Footer */}
       <Footer />
-    </div>
+    </>
   )
 }

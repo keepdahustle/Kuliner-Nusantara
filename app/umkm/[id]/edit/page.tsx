@@ -1,38 +1,190 @@
 "use client"
 
-import { useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
-import { KulinerForm } from "../../kuliner-form"
+import { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
+import Link from "next/link"
+import Header from "@/components/header"
+import Footer from "@/components/footer"
+import Gallery from "@/components/gallery"
+import RatingStars from "@/components/rating-stars"
+import BookmarkButton from "@/components/bookmark-button"
+import ReviewsSection from "@/components/reviews-section"
+import { AccordionItem } from "@/components/accordion"
+import { Badge } from "@/components/ui/badge" 
+import { MapPin, Navigation, ShoppingBag, Copy, Info } from "lucide-react"
+import { calculateDistance } from "@/lib/utils"
+import { fetchFromApi } from "@/lib/data"
 
-// Halaman edit kuliner untuk UMKM
-export default function EditPage() {
+export default function DetailKulinerPage() {
   const params = useParams()
-  const id = params.id as string
-  const router = useRouter()
+  const [item, setItem] = useState<any>(null)
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [distance, setDistance] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [copied, setCopied] = useState(false)
+  const [mounted, setMounted] = useState(false) // FIX: Proteksi Hydration
 
-  // Pastikan hanya user dengan role umkm yang bisa mengakses halaman ini
   useEffect(() => {
-    const auth = localStorage.getItem("authUser")
-    if (!auth) {
-      router.push("/login")
-      return
+    setMounted(true)
+    async function fetchData() {
+      const data = await fetchFromApi<any>(`/culinaries/${params.id}`)
+      if (data) {
+        setItem(data)
+      }
+      setLoading(false)
     }
-    const user = JSON.parse(auth)
-    if (user.userType !== "umkm") {
-      router.push("/")
+    fetchData()
+  }, [params.id])
+
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          })
+        },
+        (err) => console.warn("Lokasi ditolak", err)
+      )
     }
-  }, [router])
+  }, [])
+
+  useEffect(() => {
+    if (userLocation && item && item.lat && item.lng) {
+      const d = calculateDistance(
+        userLocation.lat,
+        userLocation.lng,
+        parseFloat(item.lat),
+        parseFloat(item.lng)
+      )
+      setDistance(d)
+    }
+  }, [userLocation, item])
+
+  const copyLink = () => {
+    if (typeof window !== "undefined") {
+      navigator.clipboard.writeText(window.location.href)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 3000)
+    }
+  }
+
+  // FIX: Kembalikan null dulu sebelum mounted untuk mencegah Hydration Error
+  if (!mounted) return null
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[#f4e8d1]">
+        <div className="text-center">
+          <div className="mb-4 h-16 w-16 animate-spin rounded-full border-4 border-[#a64029] border-t-transparent mx-auto"></div>
+          <p className="font-serif text-[#a64029] text-xl animate-pulse">Menyiapkan Data Hidangan...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!item) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-[#f4e8d1] gap-4">
+        <p className="text-xl font-bold text-[#3b2f2f]">Ouch! Kuliner ini sudah dihapus atau tidak ada.</p>
+        <Link href="/" className="bg-[#a64029] text-white px-6 py-2 rounded-xl no-underline font-bold">Kembali ke Beranda</Link>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <>
       <Header />
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6 text-foreground">Edit Kuliner</h1>
-        <KulinerForm editId={id} />
+      <main className="bg-[#f4e8d1] min-h-screen pb-12 font-sans">
+        <nav className="container mx-auto px-5 py-6 text-sm text-[#6e5849]">
+          <Link href="/" className="hover:text-[#a64029] transition-colors">Home</Link>
+          <span className="mx-2">/</span>
+          <span className="font-bold text-[#3b2f2f]">{item.nama}</span>
+        </nav>
+
+        <article className="container mx-auto px-5 max-w-7xl">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+            <div className="space-y-6">
+              <Gallery images={item.images} />
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-[#3b2f2f]/10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2 text-[#a64029] font-bold">
+                    <MapPin className="w-5 h-5" />
+                    <span>Lokasi UMKM Terverifikasi</span>
+                  </div>
+                  {distance !== null && (
+                    <span className="bg-[#4e5b31]/10 text-[#4e5b31] px-4 py-1.5 rounded-full text-xs font-bold border border-[#4e5b31]/20">
+                      {distance} km dari Anda
+                    </span>
+                  )}
+                </div>
+                <p className="text-[#3b2f2f] font-bold text-lg">{item.kota}, {item.provinsi}</p>
+                <a href={`https://www.google.com/maps?q=${item.lat},${item.lng}`} target="_blank" rel="noopener noreferrer" className="mt-4 w-full flex items-center justify-center gap-2 py-4 bg-[#4e5b31] text-white rounded-2xl hover:bg-[#3a4323] transition-all font-bold no-underline shadow-lg text-center">
+                  <Navigation className="w-4 h-4" /> Petunjuk Arah
+                </a>
+              </div>
+            </div>
+
+            <div className="space-y-8">
+              <header>
+                <Badge className="bg-[#dfaf2b] text-[#3b2f2f] hover:bg-[#dfaf2b] mb-4 border-none font-bold uppercase tracking-widest px-4 py-1">
+                  {item.kategori}
+                </Badge>
+                <h1 className="font-serif text-5xl text-[#a64029] leading-tight mb-4 font-bold">{item.nama}</h1>
+                <div className="flex items-center gap-6 bg-white/30 w-fit p-3 rounded-2xl border border-white">
+                  <RatingStars rating={Math.round(item.rating)} />
+                  <span className="text-2xl font-bold text-[#3b2f2f]">
+                    {item.harga_min ? `Rp ${item.harga_min.toLocaleString('id-ID')}` : "Harga Hubungi Mitra"}
+                  </span>
+                </div>
+              </header>
+
+              <div className="flex gap-4">
+                <BookmarkButton kulinerId={item.id.toString()} />
+                <button onClick={copyLink} className="flex items-center gap-2 px-8 py-3 bg-white border border-[#ddd] rounded-2xl font-bold text-[#6e5849] hover:bg-[#eee] transition-all">
+                  <Copy className="w-5 h-5" /> {copied ? "Disalin!" : "Bagikan"}
+                </button>
+              </div>
+
+              <section className="bg-white/60 p-8 rounded-3xl border border-white shadow-inner">
+                <h2 className="font-serif text-2xl text-[#3b2f2f] mb-4 flex items-center gap-3">
+                  <Info className="w-6 h-6 text-[#a64029]" /> Deskripsi
+                </h2>
+                <p className="text-[#6e5849] italic text-lg leading-relaxed mb-4">{item.deskripsi_ringkas}</p>
+                <div className="h-px bg-white/50 w-full mb-4"></div>
+                <p className="text-[#3b2f2f] leading-relaxed whitespace-pre-line">{item.deskripsi_lengkap}</p>
+              </section>
+
+              <section>
+                <h2 className="font-serif text-2xl text-[#3b2f2f] mb-4">Rahasia & Cara Pembuatan</h2>
+                <div className="space-y-3">
+                  <AccordionItem title="Daftar Bahan Utama">
+                    <ul className="list-disc list-inside space-y-2 text-[#6e5849] p-2">
+                      {item.bahan && item.bahan.map((b: string, i: number) => (
+                        <li key={i}>{b}</li>
+                      ))}
+                    </ul>
+                  </AccordionItem>
+                  <AccordionItem title="Langkah-langkah Memasak">
+                    <ol className="list-decimal list-inside space-y-3 text-[#3b2f2f] p-2">
+                      {item.langkah && item.langkah.map((l: string, i: number) => (
+                        <li key={i} className="leading-relaxed">{l}</li>
+                      ))}
+                    </ol>
+                  </AccordionItem>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <div className="mt-24 border-t border-[#3b2f2f]/5 pt-12">
+            {/* FIX: Mengirim ID kuliner sebagai String murni */}
+            <ReviewsSection culinaryId={item.id.toString()} />
+          </div>
+        </article>
       </main>
       <Footer />
-    </div>
+    </>
   )
 }
