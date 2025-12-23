@@ -1,202 +1,169 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Check, X, Search, Filter } from "lucide-react"
+import { useState, useEffect } from "react"
+import RatingStars from "@/components/rating-stars"
 
-interface Review {
-  id: number
+interface AdminReview {
+  id: string
+  kulinerId: string
   restoran: string
-  reviewer: string
   rating: number
-  title: string
   content: string
-  status: "pending" | "approved" | "rejected"
-  createdAt: string
+  time: string
 }
 
-export default function ModerateReviewsPage() {
-  const [reviews, setReviews] = useState<Review[]>([])
-  const [filteredReviews, setFilteredReviews] = useState<Review[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "approved" | "rejected">("all")
+// Halaman manajemen ulasan admin
+// Menampilkan semua ulasan yang dimasukkan pengguna di seluruh kuliner dari localStorage
+// Admin dapat mengedit atau menghapus ulasan. Tidak ada konsep pending/approve pada versi ini.
+export default function AdminReviewsPage() {
+  const [reviews, setReviews] = useState<AdminReview[]>([])
+  const [filteredReviews, setFilteredReviews] = useState<AdminReview[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest")
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editRating, setEditRating] = useState(0)
+  const [editText, setEditText] = useState("")
 
+  // Memuat ulasan dari localStorage dan mapping nama kuliner
   useEffect(() => {
-    const loadReviews = async () => {
+    async function loadData() {
+      // load kuliner list to map id -> title
+      let kulinerMap: Record<string, string> = {}
       try {
-        const response = await fetch("/mock-data.json")
-        const json = await response.json()
-        setReviews(json.reviews)
-      } catch (error) {
-        console.error("Error loading reviews:", error)
-      } finally {
-        setLoading(false)
+        const res = await fetch("/mock/home/kuliner.json")
+        const list = await res.json()
+        list.forEach((item: any) => {
+          kulinerMap[item.id] = item.title || item.nama || item.title
+        })
+      } catch (err) {
+        console.error("Gagal memuat data kuliner:", err)
       }
+      // load reviews from localStorage
+      let combined: AdminReview[] = []
+      try {
+        const allReviews = JSON.parse(localStorage.getItem("kulinerReviews") || "{}")
+        Object.keys(allReviews).forEach((kulinerId) => {
+          const name = kulinerMap[kulinerId] || kulinerId
+          const items: any[] = allReviews[kulinerId]
+          items.forEach((r) => {
+            combined.push({
+              id: r.id || `${kulinerId}-${r.time}`,
+              kulinerId,
+              restoran: name,
+              rating: r.rating,
+              content: r.text,
+              time: r.time,
+            })
+          })
+        })
+      } catch (err) {
+        console.error("Gagal memuat ulasan dari localStorage:", err)
+      }
+      setReviews(combined)
     }
-
-    loadReviews()
+    loadData()
   }, [])
 
+  // Filter & sorting
   useEffect(() => {
-    let result = reviews
-
-    // Filter by status
-    if (filterStatus !== "all") {
-      result = result.filter((review) => review.status === filterStatus)
-    }
-
-    // Filter by search term
+    let result = [...reviews]
+    // search filter
     if (searchTerm) {
-      result = result.filter(
-        (review) =>
-          review.restoran.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          review.reviewer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          review.content.toLowerCase().includes(searchTerm.toLowerCase()),
+      const q = searchTerm.toLowerCase()
+      result = result.filter((r) =>
+        r.restoran.toLowerCase().includes(q) || r.content.toLowerCase().includes(q),
       )
     }
-
-    // Sort
-    result = result.sort((a, b) => {
-      const dateA = new Date(a.createdAt).getTime()
-      const dateB = new Date(b.createdAt).getTime()
-      return sortBy === "newest" ? dateB - dateA : dateA - dateB
+    // sort by date
+    result.sort((a, b) => {
+      const aTime = new Date(a.time).getTime()
+      const bTime = new Date(b.time).getTime()
+      return sortBy === "newest" ? bTime - aTime : aTime - bTime
     })
-
     setFilteredReviews(result)
-  }, [reviews, filterStatus, searchTerm, sortBy])
+  }, [reviews, searchTerm, sortBy])
 
-  const handleApprove = (id: number) => {
-    setReviews(reviews.map((review) => (review.id === id ? { ...review, status: "approved" } : review)))
+  // handle delete review
+  const handleDelete = (review: AdminReview) => {
+    if (typeof window === "undefined") return
+    const allReviews = JSON.parse(localStorage.getItem("kulinerReviews") || "{}")
+    const list = allReviews[review.kulinerId] || []
+    const updated = list.filter((r: any) => r.id !== review.id)
+    allReviews[review.kulinerId] = updated
+    localStorage.setItem("kulinerReviews", JSON.stringify(allReviews))
+    setReviews((prev) => prev.filter((r) => r.id !== review.id))
   }
 
-  const handleReject = (id: number) => {
-    setReviews(reviews.map((review) => (review.id === id ? { ...review, status: "rejected" } : review)))
+  // handle start editing
+  const startEdit = (review: AdminReview) => {
+    setEditingId(review.id)
+    setEditRating(review.rating)
+    setEditText(review.content)
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-50 text-yellow-800 border border-yellow-200"
-      case "approved":
-        return "bg-green-50 text-green-800 border border-green-200"
-      case "rejected":
-        return "bg-red-50 text-red-800 border border-red-200"
-      default:
-        return ""
-    }
+  // cancel editing
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditRating(0)
+    setEditText("")
   }
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "Pending"
-      case "approved":
-        return "Disetujui"
-      case "rejected":
-        return "Ditolak"
-      default:
-        return status
-    }
-  }
-
-  const getRatingStars = (rating: number) => {
-    return "★".repeat(rating) + "☆".repeat(5 - rating)
-  }
-
-  const pendingCount = reviews.filter((r) => r.status === "pending").length
-  const approvedCount = reviews.filter((r) => r.status === "approved").length
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-foreground">Memuat ulasan...</p>
-        </div>
-      </div>
+  // save edited review
+  const saveEdit = (review: AdminReview) => {
+    if (typeof window === "undefined") return
+    const allReviews = JSON.parse(localStorage.getItem("kulinerReviews") || "{}")
+    const list = allReviews[review.kulinerId] || []
+    const updatedList = list.map((r: any) => {
+      if (r.id === review.id) {
+        return { ...r, rating: editRating, text: editText }
+      }
+      return r
+    })
+    allReviews[review.kulinerId] = updatedList
+    localStorage.setItem("kulinerReviews", JSON.stringify(allReviews))
+    // update state
+    setReviews((prev) =>
+      prev.map((r) => (r.id === review.id ? { ...r, rating: editRating, content: editText } : r)),
     )
+    cancelEdit()
   }
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Moderasi Ulasan</h1>
-        <p className="text-muted-foreground">Kelola dan review ulasan restoran dari pengguna</p>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Manajemen Ulasan</h1>
+        <p className="text-muted-foreground">Edit atau hapus ulasan pengguna terhadap kuliner</p>
       </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-blue-600 text-sm font-medium">Total Ulasan</p>
-          <p className="text-3xl font-bold text-blue-900">{reviews.length}</p>
+      {/* Pencarian dan sorting */}
+      <div className="bg-card border border-border rounded-lg p-6 flex flex-col md:flex-row gap-4">
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-foreground mb-2">Cari Ulasan</label>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Cari berdasarkan nama kuliner atau isi ulasan..."
+            className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
         </div>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <p className="text-yellow-600 text-sm font-medium">Pending Review</p>
-          <p className="text-3xl font-bold text-yellow-900">{pendingCount}</p>
-        </div>
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <p className="text-green-600 text-sm font-medium">Sudah Disetujui</p>
-          <p className="text-3xl font-bold text-green-900">{approvedCount}</p>
-        </div>
-      </div>
-
-      {/* Filters and Search */}
-      <div className="bg-card border border-border rounded-lg p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Search */}
-          <div className="lg:col-span-2">
-            <label className="block text-sm font-medium text-foreground mb-2">Cari Ulasan</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Cari restoran, nama pengguna, atau konten..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-          </div>
-
-          {/* Status Filter */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Status</label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as any)}
-              className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="all">Semua Status</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Disetujui</option>
-              <option value="rejected">Ditolak</option>
-            </select>
-          </div>
-
-          {/* Sort */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Urutkan</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="newest">Terbaru</option>
-              <option value="oldest">Terlama</option>
-            </select>
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Urutkan</label>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="newest">Terbaru</option>
+            <option value="oldest">Terlama</option>
+          </select>
         </div>
       </div>
-
-      {/* Reviews List */}
+      {/* List ulasan */}
       <div className="space-y-4">
         {filteredReviews.length === 0 ? (
           <div className="bg-card border border-border rounded-lg p-12 text-center">
-            <Filter className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
             <p className="text-foreground font-medium mb-2">Tidak ada ulasan</p>
-            <p className="text-muted-foreground">Coba ubah filter atau cari dengan kata kunci lain</p>
+            <p className="text-muted-foreground">Belum ada ulasan yang tersimpan</p>
           </div>
         ) : (
           filteredReviews.map((review) => (
@@ -204,84 +171,83 @@ export default function ModerateReviewsPage() {
               key={review.id}
               className="bg-card border border-border rounded-lg p-6 hover:shadow-lg transition-shadow"
             >
-              {/* Header */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-foreground">{review.restoran}</h3>
-                    <span className={`text-xs font-medium px-3 py-1 rounded-full ${getStatusColor(review.status)}`}>
-                      {getStatusLabel(review.status)}
-                    </span>
-                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-1">{review.restoran}</h3>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Oleh {review.reviewer}</span>
-                    <span>•</span>
-                    <span>{review.createdAt}</span>
+                    <span>{new Date(review.time).toLocaleString("id-ID")}</span>
                   </div>
                 </div>
               </div>
-
-              {/* Rating */}
-              <div className="mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-semibold text-yellow-600">{getRatingStars(review.rating)}</span>
-                  <span className="text-sm text-muted-foreground">{review.rating}/5</span>
+              {/* Konten atau form edit */}
+              {editingId === review.id ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Ubah Rating</label>
+                    <RatingStars
+                      rating={editRating}
+                      isInput={true}
+                      onRatingChange={(val: number) => setEditRating(val)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Ubah Ulasan</label>
+                    <textarea
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-border rounded-lg text-foreground"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => saveEdit(review)}
+                      className="px-4 py-2 bg-[#4E5B31] hover:bg-[#3a4323] text-white rounded-lg"
+                    >
+                      Simpan
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      className="px-4 py-2 bg-[#A64029] hover:bg-[#8b3220] text-white rounded-lg"
+                    >
+                      Batal
+                    </button>
+                  </div>
                 </div>
-              </div>
-
-              {/* Title */}
-              <h4 className="font-medium text-foreground mb-2">{review.title}</h4>
-
-              {/* Content */}
-              <p className="text-foreground text-sm mb-6 leading-relaxed">{review.content}</p>
-
-              {/* Actions */}
-              {review.status === "pending" && (
-                <div className="flex gap-3 pt-4 border-t border-border">
-                  <button
-                    onClick={() => handleApprove(review.id)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#4E5B31] hover:bg-[#3a4323] text-white rounded-lg transition-colors font-medium shadow-sm hover:shadow-md"
-                  >
-                    <Check size={18} />
-                    Setujui
-                  </button>
-                  <button
-                    onClick={() => handleReject(review.id)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#A64029] hover:bg-[#8b3220] text-white rounded-lg transition-colors font-medium shadow-sm hover:shadow-md"
-                  >
-                    <X size={18} />
-                    Tolak
-                  </button>
-                </div>
-              )}
-
-              {review.status === "approved" && (
-                <div className="flex gap-3 pt-4 border-t border-border">
-                  <button
-                    onClick={() => handleReject(review.id)}
-                    className="flex-1 px-4 py-2 bg-[#A6402922] hover:bg-[#A6402933] text-[#A64029] rounded-lg transition-colors font-medium border border-[#A6402944]"
-                  >
-                    Ubah ke Ditolak
-                  </button>
-                </div>
-              )}
-
-              {review.status === "rejected" && (
-                <div className="flex gap-3 pt-4 border-t border-border">
-                  <button
-                    onClick={() => handleApprove(review.id)}
-                    className="flex-1 px-4 py-2 bg-[#4E5B3122] hover:bg-[#4E5B3133] text-[#4E5B31] rounded-lg transition-colors font-medium border border-[#4E5B3144]"
-                  >
-                    Ubah ke Disetujui
-                  </button>
-                </div>
+              ) : (
+                <>
+                  {/* Rating */}
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-semibold text-yellow-600">
+                        {"★".repeat(review.rating) + "☆".repeat(5 - review.rating)}
+                      </span>
+                      <span className="text-sm text-muted-foreground">{review.rating}/5</span>
+                    </div>
+                  </div>
+                  {/* Isi ulasan */}
+                  <p className="text-foreground text-sm mb-6 leading-relaxed">{review.content}</p>
+                  <div className="flex gap-3 pt-4 border-t border-border">
+                    <button
+                      onClick={() => startEdit(review)}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#4E5B31] hover:bg-[#3a4323] text-white rounded-lg transition-colors font-medium shadow-sm hover:shadow-md"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(review)}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#A64029] hover:bg-[#8b3220] text-white rounded-lg transition-colors font-medium shadow-sm hover:shadow-md"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           ))
         )}
       </div>
-
-      {/* Pagination Info */}
+      {/* Info total */}
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>
           Menampilkan {filteredReviews.length} dari {reviews.length} ulasan
